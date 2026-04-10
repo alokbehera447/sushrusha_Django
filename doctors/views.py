@@ -11,7 +11,7 @@ from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 from drf_spectacular.types import OpenApiTypes
 from datetime import datetime, timedelta
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 import json
@@ -886,6 +886,7 @@ class SuperAdminDoctorManagementView(APIView):
         responses={201: DoctorProfileSerializer},
         description="Create new doctor account and profile (SuperAdmin only)"
     )
+    @transaction.atomic
     def post(self, request):
         """Create new doctor account and profile"""
         # Validate required fields

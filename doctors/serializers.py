@@ -27,7 +27,7 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = DoctorProfile
         fields = [
-            'id', 'user', 'user_name', 'user_phone', 'user_email',
+            'id', 'user', 'user_id', 'user_name', 'user_phone', 'user_email',
             'profile_picture', 'signature_url', 'signature',
             'license_number', 'qualification', 'specialization', 'sub_specialization',
             'experience_years', 'consultation_fee', 'online_consultation_fee',
@@ -232,7 +232,7 @@ class DoctorListSerializer(serializers.ModelSerializer):
     class Meta:
         model = DoctorProfile
         fields = [
-            'id', 'user', 'user_name', 'user_phone', 'user_email',
+            'id', 'user', 'user_id', 'user_name', 'user_phone', 'user_email',
             'profile_picture',
             'license_number', 'qualification', 'specialization', 'sub_specialization',
             'experience_years', 'consultation_fee', 'online_consultation_fee',
