@@ -14,6 +14,7 @@ from .models import DoctorStatus
 class DoctorProfileSerializer(serializers.ModelSerializer):
     """Serializer for doctor profile"""
     user_name = serializers.CharField(source='user.name', read_only=True)
+    user_id = serializers.CharField(source='user.id', read_only=True)
     user_phone = serializers.CharField(source='user.phone', read_only=True)
     user_email = serializers.CharField(source='user.email', read_only=True)
     experience_years = serializers.ReadOnlyField()
@@ -222,6 +223,7 @@ class DoctorReviewSerializer(serializers.ModelSerializer):
 class DoctorListSerializer(serializers.ModelSerializer):
     """Serializer for doctor list view (now includes all fields for superadmin dashboard)"""
     user_name = serializers.CharField(source='user.name', read_only=True)
+    user_id = serializers.CharField(source='user.id', read_only=True)
     user_phone = serializers.CharField(source='user.phone', read_only=True)
     user_email = serializers.CharField(source='user.email', read_only=True)
     experience_years = serializers.ReadOnlyField()
@@ -252,6 +254,7 @@ class DoctorListSerializer(serializers.ModelSerializer):
 class PublicDoctorListSerializer(serializers.ModelSerializer):
     """Serializer for public doctor listing (no sensitive information)"""
     name = serializers.CharField(source='user.name', read_only=True)
+    user_id = serializers.CharField(source='user.id', read_only=True)
     experience_years = serializers.ReadOnlyField()
     profile_picture = serializers.SerializerMethodField()
     consultation_types = serializers.SerializerMethodField()
@@ -259,7 +262,7 @@ class PublicDoctorListSerializer(serializers.ModelSerializer):
     class Meta:
         model = DoctorProfile
         fields = [
-            'id', 'name', 'profile_picture', 'specialization', 'sub_specialization',
+            'id', 'name', 'user_id', 'profile_picture', 'specialization', 'sub_specialization',
             'experience_years', 'consultation_fee', 'online_consultation_fee',
             'languages_spoken', 'bio', 'rating', 'total_reviews', 
             'clinic_name', 'clinic_address', 'consultation_types',

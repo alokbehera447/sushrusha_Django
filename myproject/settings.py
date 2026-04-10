@@ -300,8 +300,9 @@ TWILIO_PHONE_NUMBER = os.environ.get('TWILIO_PHONE_NUMBER', '')
 # Payment Gateway Configuration
 STRIPE_PUBLISHABLE_KEY = os.environ.get('STRIPE_PUBLISHABLE_KEY', '')
 STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY', '')
-RAZORPAY_KEY_ID = os.environ.get('RAZORPAY_KEY_ID', '')
-RAZORPAY_KEY_SECRET = os.environ.get('RAZORPAY_KEY_SECRET', '')
+RAZORPAY_KEY_ID = 'rzp_live_SbMTFKPqdZ49f7'
+RAZORPAY_KEY_SECRET = 'kslq90I0oVU5402IMsj8nXpm'
+RAZORPAY_WEBHOOK_SECRET = 'Diracai@123'
 
 # PhonePe Test Credentials (Official UAT Sandbox)
 PHONEPE_MERCHANT_ID = "PGTESTPAYUAT86"

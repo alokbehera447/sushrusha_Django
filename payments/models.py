@@ -112,12 +112,14 @@ class Payment(models.Model):
     def save(self, *args, **kwargs):
         if not self.id:
             # Generate payment ID
-            last_payment = Payment.objects.order_by('id').last()
-            if last_payment:
-                last_number = int(last_payment.id[3:])
-                new_number = last_number + 1
+            # Safe ID generation
+            last_payment = Payment.objects.filter(id__startswith='PAY').order_by('id').last()
+            new_number = 1
+            if last_payment and last_payment.id[3:].isdigit():
+                new_number = int(last_payment.id[3:]) + 1
             else:
-                new_number = 1
+                new_number = Payment.objects.count() + 1
+
             
             self.id = f"PAY{new_number:03d}"
         
@@ -272,12 +274,13 @@ class PaymentRefund(models.Model):
     def save(self, *args, **kwargs):
         if not self.id:
             # Generate refund ID
-            last_refund = PaymentRefund.objects.order_by('id').last()
-            if last_refund:
-                last_number = int(last_refund.id[3:])
-                new_number = last_number + 1
+            last_refund = PaymentRefund.objects.filter(id__startswith='REF').order_by('id').last()
+            new_number = 1
+            if last_refund and last_refund.id[3:].isdigit():
+                new_number = int(last_refund.id[3:]) + 1
             else:
-                new_number = 1
+                new_number = PaymentRefund.objects.count() + 1
+
             
             self.id = f"REF{new_number:03d}"
         
@@ -430,3 +433,67 @@ class PaymentDiscountUsage(models.Model):
     def __str__(self):
         return f"{self.discount.code} used by {self.user.name} - ₹{self.discount_amount}"
 
+
+class RazorpayOrder(models.Model):
+    """Tracks a Razorpay order through its full lifecycle."""
+
+    STATUS_CHOICES = [
+        ('created', 'Created'),
+        ('attempted', 'Attempted'),
+        ('paid', 'Paid'),
+        ('failed', 'Failed'),
+    ]
+
+    # Link to internal payment record (set after verification)
+    payment = models.OneToOneField(
+        Payment,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='razorpay_order',
+    )
+    patient = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='razorpay_orders',
+    )
+    consultation = models.ForeignKey(
+        'consultations.Consultation',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='razorpay_orders',
+    )
+
+    # Razorpay identifiers
+    razorpay_order_id = models.CharField(max_length=100, unique=True)
+    razorpay_payment_id = models.CharField(max_length=100, blank=True)
+    razorpay_signature = models.CharField(max_length=255, blank=True)
+
+    # Order details
+    amount = models.DecimalField(max_digits=10, decimal_places=2)   # INR
+    amount_in_paise = models.PositiveIntegerField()                  # Razorpay uses paise
+    currency = models.CharField(max_length=3, default='INR')
+    receipt = models.CharField(max_length=100, blank=True)
+    notes = models.JSONField(default=dict)
+
+    # Status
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='created')
+    is_verified = models.BooleanField(default=False)
+
+    # Full gateway responses
+    order_response = models.JSONField(default=dict)
+    payment_response = models.JSONField(default=dict)
+
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'razorpay_orders'
+        verbose_name = 'Razorpay Order'
+        verbose_name_plural = 'Razorpay Orders'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.razorpay_order_id} – ₹{self.amount} ({self.status})"
