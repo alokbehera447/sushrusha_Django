@@ -183,10 +183,15 @@ class RazorpayCreateOrderView(APIView):
         consultation = None
         if consultation_id:
             try:
-                consultation = Consultation.objects.get(
-                    id=consultation_id,
-                    patient=request.user,
-                )
+                # If user is admin/superadmin, allow any consultation.
+                # Otherwise, restrict to consultations belonging to the patient.
+                if request.user.role in ('admin', 'superadmin'):
+                    consultation = Consultation.objects.get(id=consultation_id)
+                else:
+                    consultation = Consultation.objects.get(
+                        id=consultation_id,
+                        patient=request.user,
+                    )
             except Consultation.DoesNotExist:
                 return Response(
                     {
@@ -202,11 +207,16 @@ class RazorpayCreateOrderView(APIView):
         # ── Build Razorpay order ──────────────────────────────────────────
         amount_paise = int(amount_inr * 100)  # Razorpay needs paise
         receipt = f"rcpt_{uuid.uuid4().hex[:12]}"
+        
+        # Use the actual patient ID if it's a consultation payment
+        target_patient_user = consultation.patient if consultation else request.user
+        
         notes = {
-            "patient_id": str(request.user.id),
-            "patient_name": getattr(request.user, "name", str(request.user)),
+            "patient_id": str(target_patient_user.id),
+            "patient_name": getattr(target_patient_user, "name", str(target_patient_user)),
             "consultation_id": str(consultation_id) if consultation_id else "",
             "description": description,
+            "initiated_by": str(request.user.id),
         }
 
         try:
@@ -242,7 +252,7 @@ class RazorpayCreateOrderView(APIView):
 
         # ── Persist RazorpayOrder record ──────────────────────────────────
         rzp_order_record = RazorpayOrder.objects.create(
-            patient=request.user,
+            patient=target_patient_user, # Associates with the actual patient
             consultation=consultation,
             razorpay_order_id=rzp_order["id"],
             amount=amount_inr,
@@ -331,10 +341,16 @@ class RazorpayVerifyPaymentView(APIView):
 
         # ── Find our RazorpayOrder record ─────────────────────────────────
         try:
-            rzp_order_record = RazorpayOrder.objects.get(
-                razorpay_order_id=order_id,
-                patient=request.user,
-            )
+            # If admin, allow finding any order. Otherwise, only patient's own orders.
+            if request.user.role in ('admin', 'superadmin'):
+                rzp_order_record = RazorpayOrder.objects.get(
+                    razorpay_order_id=order_id,
+                )
+            else:
+                rzp_order_record = RazorpayOrder.objects.get(
+                    razorpay_order_id=order_id,
+                    patient=request.user,
+                )
         except RazorpayOrder.DoesNotExist:
             return Response(
                 {
@@ -420,7 +436,7 @@ class RazorpayVerifyPaymentView(APIView):
         else:
             # Create new internal Payment record
             payment = Payment.objects.create(
-                patient=request.user,
+                patient=rzp_order_record.patient, # Use patient from the order record
                 doctor=rzp_order_record.consultation.doctor if rzp_order_record.consultation else None,
                 consultation=rzp_order_record.consultation,
                 amount=rzp_order_record.amount,
