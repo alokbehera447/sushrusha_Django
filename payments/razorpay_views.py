@@ -614,6 +614,17 @@ class RazorpayWebhookView(APIView):
             cons = rzp_record.consultation
             cons.payment_status = 'paid'
             cons.is_paid = True
+            
+            # Set payment method if available in webhook entity
+            rzp_method = payment_entity.get("method", "online")
+            method_map = {
+                "card": "card",
+                "upi": "upi",
+                "netbanking": "net_banking",
+                "wallet": "wallet",
+                "emandate": "bank_transfer",
+            }
+            cons.payment_method = method_map.get(rzp_method, "online")
             cons.save()
 
         logger.info("Webhook: payment.captured handled for order %s", rzp_order_id)

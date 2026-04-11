@@ -21,7 +21,7 @@ class ConsultationSerializer(serializers.ModelSerializer):
             'id', 'patient', 'doctor', 'patient_name', 'doctor_name',
             'consultation_type', 'scheduled_date', 'scheduled_time', 'duration',
             'status', 'doctor_notes', 'patient_notes', 'payment_status', 
-            'consultation_fee', 'is_paid', 'created_at', 'updated_at',
+            'consultation_fee', 'is_paid', 'payment_method', 'created_at', 'updated_at',
             'doctor_meeting_link', 'booked_slot', 'checked_in_at', 'checked_in_by',
             'ready_for_consultation_at', 'ready_marked_by', 'is_checked_in',
             'is_ready_for_consultation'
@@ -325,7 +325,8 @@ class ConsultationUpdateSerializer(serializers.ModelSerializer):
         model = Consultation
         fields = [
             'consultation_type', 'scheduled_date', 'scheduled_time', 'duration',
-            'status', 'doctor_notes', 'patient_notes', 'payment_status'
+            'status', 'doctor_notes', 'patient_notes', 'payment_status',
+            'payment_method', 'is_paid'
         ]
 
 

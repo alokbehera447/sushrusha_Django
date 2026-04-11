@@ -449,6 +449,7 @@ CHANNEL_LAYERS = {
 }
 # OTP Configuration
 OTP_TEST_MODE = True
+# OTP_TEST_MODE = False
 OTP_TEST_CODE = '999999'
 
 
