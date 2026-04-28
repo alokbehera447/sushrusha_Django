@@ -851,17 +851,34 @@ class ConsultationViewSet(ModelViewSet):
             
             # If no specific slots are found, we provide a default daily shift (9 AM to 6 PM)
             # This ensures dynamic booking still works even if doctor hasn't set slots.
-            if not available_slots_query.exists():
-                from datetime import time
-                print(f"DEBUG: No specific slots for {doctor.name}, using default shift")
-                # Create a list with one large "availability window" object for calculation
-                class DummySlot:
-                    def __init__(self, start, end):
-                        self.start_time = start
-                        self.end_time = end
-                available_slots = [DummySlot(time(9, 0), time(12, 30)), DummySlot(time(14, 0), time(18, 0))]
-            else:
-                available_slots = list(available_slots_query)
+            # if not available_slots_query.exists():
+            #     from datetime import time
+            #     print(f"DEBUG: No specific slots for {doctor.name}, using default shift")
+            #     # Create a list with one large "availability window" object for calculation
+            #     class DummySlot:
+            #         def __init__(self, start, end):
+            #             self.start_time = start
+            #             self.end_time = end
+            #     available_slots = [DummySlot(time(9, 0), time(12, 30)), DummySlot(time(14, 0), time(18, 0))]
+            # else:
+            #     available_slots = list(available_slots_query)
+
+            available_slots = list(available_slots_query)
+
+            if not available_slots:
+                return Response({
+                    'success': True,
+                    'data': {
+                        'slots': [],
+                        'clinic_duration': consultation_duration,
+                        'doctor_consultation_duration': consultation_duration,
+                        'date': date,
+                        'doctor_name': doctor.name,
+                        'clinic_name': clinic.name if clinic else 'Default Clinic'
+                    },
+                    'message': f'No slots available for {date}',
+                    'timestamp': timezone.now().isoformat()
+                }, status=status.HTTP_200_OK)
             
             print(f"DEBUG: Doctor {doctor.name} has {len(available_slots)} slot windows")
             print(f"DEBUG: Found {len(existing_consultations)} existing consultations")
