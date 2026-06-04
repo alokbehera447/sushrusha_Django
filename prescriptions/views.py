@@ -142,17 +142,25 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
         """Create prescription or update if exists"""
         serializer = self.get_serializer(data=request.data, context={'request': request})
         if serializer.is_valid():
-            # Check if prescription already exists for this consultation-doctor-patient combination
+            # Check if prescription already exists for this consultation-patient combination
             consultation_id = request.data.get('consultation')
             patient_id = request.data.get('patient')
+            user = request.user
             
             if consultation_id and patient_id:
                 try:
-                    existing_prescription = Prescription.objects.get(
-                        consultation_id=consultation_id,
-                        doctor=request.user,
-                        patient_id=patient_id
-                    )
+                    # Superadmin/admin can find prescriptions regardless of who wrote them
+                    if user.role in ['superadmin', 'admin']:
+                        existing_prescription = Prescription.objects.get(
+                            consultation_id=consultation_id,
+                            patient_id=patient_id
+                        )
+                    else:
+                        existing_prescription = Prescription.objects.get(
+                            consultation_id=consultation_id,
+                            doctor=request.user,
+                            patient_id=patient_id
+                        )
                     # Update existing prescription
                     update_serializer = PrescriptionUpdateSerializer(
                         existing_prescription, 
@@ -180,7 +188,14 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
                             'timestamp': timezone.now().isoformat()
                         }, status=status.HTTP_400_BAD_REQUEST)
                 except Prescription.DoesNotExist:
-                    # Create new prescription
+                    # Create new prescription — for superadmin/admin, set doctor to the consultation's doctor
+                    if user.role in ['superadmin', 'admin']:
+                        from consultations.models import Consultation as ConsultationModel
+                        try:
+                            consultation_obj = ConsultationModel.objects.get(id=consultation_id)
+                            serializer.context['override_doctor'] = consultation_obj.doctor
+                        except ConsultationModel.DoesNotExist:
+                            pass
                     prescription = serializer.save()
                     response_serializer = PrescriptionDetailSerializer(prescription)
                     return Response({
@@ -272,10 +287,17 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
     def by_consultation(self, request, consultation_id=None):
         """Get prescription for a specific consultation"""
         try:
-            prescription = Prescription.objects.get(
-                consultation_id=consultation_id,
-                doctor=request.user
-            )
+            user = request.user
+            # Superadmin and admin can access any prescription for this consultation
+            if user.role in ['superadmin', 'admin']:
+                prescription = Prescription.objects.get(
+                    consultation_id=consultation_id
+                )
+            else:
+                prescription = Prescription.objects.get(
+                    consultation_id=consultation_id,
+                    doctor=request.user
+                )
             serializer = PrescriptionDetailSerializer(prescription)
             return Response({
                 'success': True,
@@ -321,8 +343,8 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
         """Finalize a prescription and generate PDF"""
         prescription = self.get_object()
         
-        # Only allow finalization if user is the doctor who created it
-        if request.user != prescription.doctor:
+        # Only allow finalization if user is the doctor who created it OR admin/superadmin
+        if request.user != prescription.doctor and request.user.role not in ['superadmin', 'admin']:
             return Response({
                 'success': False,
                 'error': {
@@ -436,8 +458,8 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
         """Save prescription as draft with all data"""
         prescription = self.get_object()
         
-        # Only allow save if user is the doctor who created it
-        if request.user != prescription.doctor:
+        # Only allow save if user is the doctor who created it OR admin/superadmin
+        if request.user != prescription.doctor and request.user.role not in ['superadmin', 'admin']:
             return Response({
                 'success': False,
                 'error': {
@@ -529,8 +551,8 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
         """Auto-save prescription data - used for draft auto-saving"""
         prescription = self.get_object()
         
-        # Only allow auto-save if user is the doctor who created it
-        if request.user != prescription.doctor:
+        # Only allow auto-save if user is the doctor who created it OR admin/superadmin
+        if request.user != prescription.doctor and request.user.role not in ['superadmin', 'admin']:
             return Response({
                 'success': False,
                 'error': {
@@ -576,8 +598,8 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
         """Finalize prescription and generate PDF with versioning"""
         prescription = self.get_object()
         
-        # Only allow finalization if user is the doctor who created it
-        if request.user != prescription.doctor:
+        # Only allow finalization if user is the doctor who created it OR admin/superadmin
+        if request.user != prescription.doctor and request.user.role not in ['superadmin', 'admin']:
             return Response({
                 'success': False,
                 'error': {
@@ -1110,6 +1132,75 @@ class InvestigationViewSet(viewsets.ModelViewSet):
             'data': serializer.data,
             'message': 'Tests retrieved successfully'
         })
+
+    @action(detail=False, methods=['post'], url_path='auto-create')
+    def auto_create(self, request):
+        """Auto-create an investigation test if it doesn't already exist.
+        
+        Request body:
+            name (str, required): Name of the investigation test
+            category_id (int, optional): ID of the category; defaults to 'General' category
+        
+        Returns the test object and whether it was 'existing' or 'newly_created'.
+        """
+        name = request.data.get('name', '').strip()
+        category_id = request.data.get('category_id')
+
+        if not name:
+            return Response({
+                'success': False,
+                'message': 'Test name is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Resolve category
+        category = None
+        if category_id:
+            try:
+                category = InvestigationCategory.objects.get(id=category_id)
+            except InvestigationCategory.DoesNotExist:
+                return Response({
+                    'success': False,
+                    'message': f'Category with id {category_id} not found'
+                }, status=status.HTTP_404_NOT_FOUND)
+        else:
+            # Try to find or create a default "General" category
+            category, _ = InvestigationCategory.objects.get_or_create(
+                name='General',
+                defaults={'description': 'General investigation tests', 'is_active': True, 'order': 999}
+            )
+
+        # Try to find existing test (case-insensitive match within the same category)
+        existing_test = InvestigationTest.objects.filter(
+            name__iexact=name,
+            category=category
+        ).first()
+
+        if existing_test:
+            serializer = InvestigationTestSerializer(existing_test)
+            return Response({
+                'success': True,
+                'data': {
+                    'test': serializer.data,
+                    'source': 'existing'
+                },
+                'message': f'Found existing test: {existing_test.name}'
+            }, status=status.HTTP_200_OK)
+
+        # Create a new test
+        test = InvestigationTest.objects.create(
+            name=name,
+            category=category,
+            is_active=True
+        )
+        serializer = InvestigationTestSerializer(test)
+        return Response({
+            'success': True,
+            'data': {
+                'test': serializer.data,
+                'source': 'newly_created'
+            },
+            'message': f'Created new test: {test.name}'
+        }, status=status.HTTP_201_CREATED)
 
 
 class PrescriptionInvestigationViewSet(viewsets.ModelViewSet):

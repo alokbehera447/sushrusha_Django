@@ -178,8 +178,9 @@ class PrescriptionCreateSerializer(serializers.ModelSerializer):
         medications_data = validated_data.pop('medications', [])
         vital_signs_data = validated_data.pop('vital_signs', None)
         
-        # Set doctor from request user
-        validated_data['doctor'] = self.context['request'].user
+        # Set doctor from request user, but allow override (e.g. superadmin writing on behalf of doctor)
+        override_doctor = self.context.get('override_doctor')
+        validated_data['doctor'] = override_doctor if override_doctor else self.context['request'].user
         
         # Create prescription
         prescription = Prescription.objects.create(**validated_data)

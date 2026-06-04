@@ -3134,22 +3134,24 @@ class ConsultationCompleteView(APIView):
         try:
             consultation = Consultation.objects.get(id=consultation_id)
             
-            # Check permissions - only doctors can complete consultations
+            # Check permissions - doctors, admins, and superadmins can complete consultations
             user = request.user
-            if user.role != 'doctor':
+            if user.role not in ['doctor', 'admin', 'superadmin']:
                 return Response({
                     'success': False,
                     'error': 'Only doctors can complete consultations'
                 }, status=status.HTTP_403_FORBIDDEN)
             
-            if consultation.doctor != user:
+            # Doctors can only complete their own consultations;
+            # admins and superadmins can complete any consultation
+            if user.role == 'doctor' and consultation.doctor != user:
                 return Response({
                     'success': False,
                     'error': 'You can only complete your own consultations'
                 }, status=status.HTTP_403_FORBIDDEN)
             
             # Check if consultation can be completed
-            if consultation.status != 'in_progress':
+            if consultation.status not in ['in_progress', 'ongoing', 'ready_for_consultation', 'patient_checked_in']:
                 return Response({
                     'success': False,
                     'error': f'Cannot complete consultation. Current status is: {consultation.status}. Only in-progress consultations can be completed.'

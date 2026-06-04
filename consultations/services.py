@@ -428,8 +428,9 @@ class ConsultationService:
         """
         Complete a consultation
         """
-        if consultation.status != 'in_progress':
-            raise ValidationError("Only in-progress consultations can be completed")
+        completable_statuses = ['in_progress', 'ongoing', 'ready_for_consultation', 'patient_checked_in', 'scheduled']
+        if consultation.status not in completable_statuses:
+            raise ValidationError("Only active consultations can be completed")
         
         consultation.status = 'completed'
         consultation.actual_end_time = timezone.now()
