@@ -1124,14 +1124,113 @@ class InvestigationViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def tests(self, request):
         """Get all investigation tests"""
-        tests = InvestigationTest.objects.filter(is_active=True).select_related('category')
-        serializer = InvestigationTestSerializer(tests, many=True)
+        queryset = InvestigationTest.objects.all().select_related('category')
+        
+        # Check if user is admin/superadmin to determine default active filtering
+        is_admin = request.user and request.user.is_authenticated and request.user.role in ['admin', 'superadmin']
+        
+        is_active_param = request.query_params.get('is_active')
+        if is_active_param is not None:
+            if is_active_param.lower() == 'true':
+                queryset = queryset.filter(is_active=True)
+            elif is_active_param.lower() == 'false':
+                queryset = queryset.filter(is_active=False)
+        elif not is_admin:
+            # For non-admin/regular users (like prescription workflow), default to active only
+            queryset = queryset.filter(is_active=True)
+            
+        category_id = request.query_params.get('category_id')
+        if category_id:
+            queryset = queryset.filter(category_id=category_id)
+            
+        search = request.query_params.get('search')
+        if search:
+            queryset = queryset.filter(
+                models.Q(name__icontains=search) | models.Q(code__icontains=search)
+            )
+            
+        serializer = InvestigationTestSerializer(queryset, many=True)
         
         return Response({
             'success': True,
             'data': serializer.data,
             'message': 'Tests retrieved successfully'
         })
+
+    @action(detail=False, methods=['post'])
+    def create_test(self, request):
+        """Create a new investigation test"""
+        if request.user.role not in ['admin', 'superadmin']:
+            return Response({
+                'success': False,
+                'message': 'Only administrators can create tests.'
+            }, status=status.HTTP_403_FORBIDDEN)
+            
+        serializer = InvestigationTestSerializer(data=request.data)
+        if serializer.is_valid():
+            test = serializer.save()
+            return Response({
+                'success': True,
+                'data': InvestigationTestSerializer(test).data,
+                'message': 'Investigation test created successfully'
+            }, status=status.HTTP_201_CREATED)
+        return Response({
+            'success': False,
+            'message': 'Invalid data',
+            'errors': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    def update_test(self, request, test_pk=None):
+        """Update an investigation test"""
+        if request.user.role not in ['admin', 'superadmin']:
+            return Response({
+                'success': False,
+                'message': 'Only administrators can update tests.'
+            }, status=status.HTTP_403_FORBIDDEN)
+            
+        try:
+            test = InvestigationTest.objects.get(id=test_pk)
+        except InvestigationTest.DoesNotExist:
+            return Response({
+                'success': False,
+                'message': f'Test with id {test_pk} not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+            
+        serializer = InvestigationTestSerializer(test, data=request.data, partial=True)
+        if serializer.is_valid():
+            updated_test = serializer.save()
+            return Response({
+                'success': True,
+                'data': InvestigationTestSerializer(updated_test).data,
+                'message': 'Investigation test updated successfully'
+            })
+        return Response({
+            'success': False,
+            'message': 'Invalid data',
+            'errors': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete_test(self, request, test_pk=None):
+        """Delete an investigation test"""
+        if request.user.role not in ['admin', 'superadmin']:
+            return Response({
+                'success': False,
+                'message': 'Only administrators can delete tests.'
+            }, status=status.HTTP_403_FORBIDDEN)
+            
+        try:
+            test = InvestigationTest.objects.get(id=test_pk)
+        except InvestigationTest.DoesNotExist:
+            return Response({
+                'success': False,
+                'message': f'Test with id {test_pk} not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+            
+        test.delete()
+        return Response({
+            'success': True,
+            'message': 'Investigation test deleted successfully'
+        }, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['post'], url_path='auto-create')
     def auto_create(self, request):

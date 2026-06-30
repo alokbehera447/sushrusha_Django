@@ -31,14 +31,14 @@ from .services.fda_api import search_fda_medications, get_fda_medication_details
 
 
 class ClinicPagination(PageNumberPagination):
-    page_size = 20
+    page_size = 1000
     page_size_query_param = 'page_size'
-    max_page_size = 100
+    max_page_size = 1000
 
 class MedicationPagination(PageNumberPagination):
     page_size = 20
     page_size_query_param = 'page_size'
-    max_page_size = 100
+    max_page_size = 1000
 
 class ClinicViewSet(ModelViewSet):
     queryset = Clinic.objects.all()

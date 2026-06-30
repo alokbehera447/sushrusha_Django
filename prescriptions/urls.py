@@ -53,8 +53,13 @@ custom_urlpatterns = [
         'get': 'categories'
     }), name='investigation-categories'),
     path('investigations/tests/', InvestigationViewSet.as_view({
-        'get': 'tests'
+        'get': 'tests',
+        'post': 'create_test'
     }), name='investigation-tests'),
+    path('investigations/tests/<int:test_pk>/', InvestigationViewSet.as_view({
+        'patch': 'update_test',
+        'delete': 'delete_test'
+    }), name='investigation-test-detail'),
     path('investigations/auto-create/', InvestigationViewSet.as_view({
         'post': 'auto_create'
     }), name='investigation-auto-create'),
