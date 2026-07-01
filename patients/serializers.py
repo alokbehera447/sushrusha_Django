@@ -5,36 +5,103 @@ from .models import PatientProfile, MedicalRecord, PatientDocument, PatientNote
 
 
 class PatientProfileSerializer(serializers.ModelSerializer):
-    """Serializer for patient profile"""
-    user_name = serializers.CharField(source='user.name', read_only=True)
-    user_phone = serializers.CharField(source='user.phone', read_only=True)
-    user_email = serializers.CharField(source='user.email', read_only=True)
-    date_of_birth = serializers.DateField(source='user.date_of_birth', read_only=True)
-    gender = serializers.CharField(source='user.gender', read_only=True)
-    age = serializers.ReadOnlyField()
-    medical_history = serializers.CharField(source='user.medical_history', read_only=True)
-    street = serializers.CharField(source='user.street', read_only=True)
-    city = serializers.CharField(source='user.city', read_only=True)
-    state = serializers.CharField(source='user.state', read_only=True)
-    pincode = serializers.CharField(source='user.pincode', read_only=True)
-    country = serializers.CharField(source='user.country', read_only=True)
-    emergency_contact_name = serializers.CharField(source='user.emergency_contact_name', read_only=True)
-    emergency_contact_phone = serializers.CharField(source='user.emergency_contact_phone', read_only=True)
-    emergency_contact_relationship = serializers.CharField(source='user.emergency_contact_relationship', read_only=True)
+    """Serializer for patient profile detail - now works with User objects"""
+    user_name = serializers.CharField(source='name', read_only=True)
+    user_phone = serializers.CharField(source='phone', read_only=True)
+    user_email = serializers.CharField(source='email', read_only=True)
+    date_of_birth = serializers.DateField(read_only=True)
+    gender = serializers.CharField(read_only=True)
+    age = serializers.SerializerMethodField()
+    
+    # PatientProfile fields (may be None if profile doesn't exist)
+    profile_id = serializers.SerializerMethodField()
+    blood_group = serializers.SerializerMethodField()
+    allergies = serializers.SerializerMethodField()
+    chronic_conditions = serializers.SerializerMethodField()
+    current_medications = serializers.SerializerMethodField()
+    insurance_provider = serializers.SerializerMethodField()
+    insurance_policy_number = serializers.SerializerMethodField()
+    insurance_expiry = serializers.SerializerMethodField()
+    preferred_language = serializers.SerializerMethodField()
+    profile_is_active = serializers.SerializerMethodField()
+    profile_created_at = serializers.SerializerMethodField()
+    profile_updated_at = serializers.SerializerMethodField()
+    has_profile = serializers.SerializerMethodField()
     
     class Meta:
-        model = PatientProfile
+        model = User
         fields = [
-            'id', 'user', 'user_name', 'user_phone', 'user_email',
-            'date_of_birth', 'gender', 'blood_group',
-            'allergies', 'chronic_conditions', 'current_medications',
-            'insurance_provider', 'insurance_policy_number', 'insurance_expiry',
-            'preferred_language', 'medical_history',
+            'id', 'user_name', 'user_phone', 'user_email',
+            'date_of_birth', 'gender', 'age',
             'street', 'city', 'state', 'pincode', 'country',
             'emergency_contact_name', 'emergency_contact_phone', 'emergency_contact_relationship',
-            'created_at', 'updated_at', 'age'
+            'medical_history', 'is_active', 'is_verified',
+            'profile_id', 'blood_group', 'allergies', 'chronic_conditions', 'current_medications',
+            'insurance_provider', 'insurance_policy_number', 'insurance_expiry',
+            'preferred_language', 'profile_is_active', 'profile_created_at', 'profile_updated_at',
+            'has_profile'
         ]
-        read_only_fields = ['id', 'user', 'created_at', 'updated_at']
+        read_only_fields = ['id']
+    
+    def get_age(self, obj):
+        """Calculate age from date of birth"""
+        if obj.date_of_birth:
+            from datetime import date
+            today = date.today()
+            return today.year - obj.date_of_birth.year - ((today.month, today.day) < (obj.date_of_birth.month, obj.date_of_birth.day))
+        return None
+    
+    def get_has_profile(self, obj):
+        """Check if user has a PatientProfile"""
+        return hasattr(obj, 'patient_profile') and obj.patient_profile is not None
+    
+    def get_profile_id(self, obj):
+        """Get PatientProfile ID if exists"""
+        return obj.patient_profile.id if hasattr(obj, 'patient_profile') and obj.patient_profile else None
+    
+    def get_blood_group(self, obj):
+        """Get blood group from profile if exists"""
+        return obj.patient_profile.blood_group if hasattr(obj, 'patient_profile') and obj.patient_profile else None
+    
+    def get_allergies(self, obj):
+        """Get allergies from profile if exists"""
+        return obj.patient_profile.allergies if hasattr(obj, 'patient_profile') and obj.patient_profile else ''
+    
+    def get_chronic_conditions(self, obj):
+        """Get chronic conditions from profile if exists"""
+        return obj.patient_profile.chronic_conditions if hasattr(obj, 'patient_profile') and obj.patient_profile else []
+    
+    def get_current_medications(self, obj):
+        """Get current medications from profile if exists"""
+        return obj.patient_profile.current_medications if hasattr(obj, 'patient_profile') and obj.patient_profile else []
+    
+    def get_insurance_provider(self, obj):
+        """Get insurance provider from profile if exists"""
+        return obj.patient_profile.insurance_provider if hasattr(obj, 'patient_profile') and obj.patient_profile else ''
+    
+    def get_insurance_policy_number(self, obj):
+        """Get insurance policy number from profile if exists"""
+        return obj.patient_profile.insurance_policy_number if hasattr(obj, 'patient_profile') and obj.patient_profile else ''
+    
+    def get_insurance_expiry(self, obj):
+        """Get insurance expiry from profile if exists"""
+        return obj.patient_profile.insurance_expiry if hasattr(obj, 'patient_profile') and obj.patient_profile else None
+    
+    def get_preferred_language(self, obj):
+        """Get preferred language from profile if exists"""
+        return obj.patient_profile.preferred_language if hasattr(obj, 'patient_profile') and obj.patient_profile else 'english'
+    
+    def get_profile_is_active(self, obj):
+        """Get profile is_active status if exists"""
+        return obj.patient_profile.is_active if hasattr(obj, 'patient_profile') and obj.patient_profile else None
+    
+    def get_profile_created_at(self, obj):
+        """Get profile created_at if exists"""
+        return obj.patient_profile.created_at if hasattr(obj, 'patient_profile') and obj.patient_profile else None
+    
+    def get_profile_updated_at(self, obj):
+        """Get profile updated_at if exists"""
+        return obj.patient_profile.updated_at if hasattr(obj, 'patient_profile') and obj.patient_profile else None
 
 
 class PatientProfileCreateSerializer(serializers.ModelSerializer):
@@ -85,6 +152,7 @@ class MedicalRecordSerializer(serializers.ModelSerializer):
 
 class MedicalRecordCreateSerializer(serializers.ModelSerializer):
     """Serializer for creating medical records"""
+    description = serializers.CharField(required=False, allow_blank=True, default='')
     
     class Meta:
         model = MedicalRecord
@@ -95,9 +163,10 @@ class MedicalRecordCreateSerializer(serializers.ModelSerializer):
     def validate_document(self, value):
         """Validate uploaded document"""
         if value:
-            # Check file size (max 10MB)
-            if value.size > 10 * 1024 * 1024:
-                raise serializers.ValidationError("File size must be less than 10MB")
+            # Check file size (max 100MB)
+            max_size = 100 * 1024 * 1024  # 100MB
+            if value.size > max_size:
+                raise serializers.ValidationError("File size must be less than 100MB")
             
             # Check file type
             allowed_types = [
@@ -121,6 +190,38 @@ class MedicalRecordCreateSerializer(serializers.ModelSerializer):
         validated_data['patient_id'] = patient_id
         validated_data['recorded_by'] = doctor
         return super().create(validated_data)
+
+
+class BulkMedicalRecordCreateSerializer(serializers.Serializer):
+    """Serializer for creating multiple medical records at once"""
+    record_type = serializers.ChoiceField(choices=MedicalRecord.RECORD_TYPES)
+    title = serializers.CharField(max_length=200)
+    date_recorded = serializers.DateField()
+    documents = serializers.ListField(
+        child=serializers.FileField(),
+        required=True,
+        min_length=1
+    )
+    
+    def validate_documents(self, value):
+        """Validate all uploaded documents"""
+        allowed_types = [
+            'image/jpeg', 'image/jpg', 'image/png', 'image/gif',
+            'application/pdf', 'application/msword', 
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'text/plain'
+        ]
+        
+        max_size = 100 * 1024 * 1024  # 100MB
+        for doc in value:
+            if doc.size > max_size:
+                raise serializers.ValidationError(f"File '{doc.name}' exceeds 100MB limit")
+            if doc.content_type not in allowed_types:
+                raise serializers.ValidationError(
+                    f"File '{doc.name}' has invalid type. Only JPEG, PNG, GIF, PDF, DOC, DOCX, and TXT files are allowed"
+                )
+        
+        return value
 
 
 class PatientDocumentSerializer(serializers.ModelSerializer):
@@ -162,9 +263,10 @@ class PatientDocumentUploadSerializer(serializers.ModelSerializer):
     def validate_file(self, value):
         """Validate uploaded file"""
         if value:
-            # Check file size (max 10MB)
-            if value.size > 10 * 1024 * 1024:
-                raise serializers.ValidationError("File size must be less than 10MB")
+            # Check file size (max 100MB)
+            max_size = 100 * 1024 * 1024  # 100MB
+            if value.size > max_size:
+                raise serializers.ValidationError("File size must be less than 100MB")
             
             # Check file type
             allowed_types = [
@@ -221,49 +323,120 @@ class PatientNoteCreateSerializer(serializers.ModelSerializer):
 
 
 class PatientListSerializer(serializers.ModelSerializer):
-    """Serializer for patient list view"""
-    user_name = serializers.CharField(source='user.name', read_only=True)
-    user_phone = serializers.CharField(source='user.phone', read_only=True)
-    user_email = serializers.CharField(source='user.email', read_only=True)
-    date_of_birth = serializers.DateField(source='user.date_of_birth', read_only=True)
-    gender = serializers.CharField(source='user.gender', read_only=True)
-    age = serializers.ReadOnlyField()
+    """Serializer for patient list view - now works with User objects and includes profile data if available"""
+    user_name = serializers.CharField(source='name', read_only=True)
+    user_phone = serializers.CharField(source='phone', read_only=True)
+    user_email = serializers.CharField(source='email', read_only=True)
+    date_of_birth = serializers.DateField(read_only=True)
+    gender = serializers.CharField(read_only=True)
+    age = serializers.SerializerMethodField()
     total_consultations = serializers.SerializerMethodField()
     last_consultation_date = serializers.SerializerMethodField()
-    street = serializers.CharField(source='user.street', read_only=True)
-    city = serializers.CharField(source='user.city', read_only=True)
-    state = serializers.CharField(source='user.state', read_only=True)
-    pincode = serializers.CharField(source='user.pincode', read_only=True)
-    country = serializers.CharField(source='user.country', read_only=True)
-    emergency_contact_name = serializers.CharField(source='user.emergency_contact_name', read_only=True)
-    emergency_contact_phone = serializers.CharField(source='user.emergency_contact_phone', read_only=True)
-    emergency_contact_relationship = serializers.CharField(source='user.emergency_contact_relationship', read_only=True)
-    medical_history = serializers.CharField(source='user.medical_history', read_only=True)
+    
+    # PatientProfile fields (may be None if profile doesn't exist)
+    profile_id = serializers.SerializerMethodField()
+    blood_group = serializers.SerializerMethodField()
+    allergies = serializers.SerializerMethodField()
+    chronic_conditions = serializers.SerializerMethodField()
+    current_medications = serializers.SerializerMethodField()
+    preferred_language = serializers.SerializerMethodField()
+    profile_is_active = serializers.SerializerMethodField()
+    profile_created_at = serializers.SerializerMethodField()
+    profile_updated_at = serializers.SerializerMethodField()
+    has_profile = serializers.SerializerMethodField()
+    
+    # Clinic information
+    clinics = serializers.SerializerMethodField()
     
     class Meta:
-        model = PatientProfile
+        model = User
         fields = [
-            'id', 'user', 'user_name', 'user_phone', 'user_email',
-            'date_of_birth', 'gender', 'blood_group',
-            'allergies', 'chronic_conditions', 'current_medications',
-            'preferred_language', 'is_active',
+            'id', 'user_name', 'user_phone', 'user_email',
+            'date_of_birth', 'gender', 'age',
             'street', 'city', 'state', 'pincode', 'country',
             'emergency_contact_name', 'emergency_contact_phone', 'emergency_contact_relationship',
-            'medical_history',
-            'created_at', 'updated_at', 'age',
-            'total_consultations', 'last_consultation_date'
+            'medical_history', 'is_active', 'is_verified',
+            'profile_id', 'blood_group', 'allergies', 'chronic_conditions', 'current_medications',
+            'preferred_language', 'profile_is_active', 'profile_created_at', 'profile_updated_at',
+            'total_consultations', 'last_consultation_date', 'has_profile', 'clinics'
         ]
+    
+    def get_age(self, obj):
+        """Calculate age from date of birth"""
+        if obj.date_of_birth:
+            from datetime import date
+            today = date.today()
+            return today.year - obj.date_of_birth.year - ((today.month, today.day) < (obj.date_of_birth.month, obj.date_of_birth.day))
+        return None
+    
+    def get_has_profile(self, obj):
+        """Check if user has a PatientProfile"""
+        return hasattr(obj, 'patient_profile') and obj.patient_profile is not None
+    
+    def get_profile_id(self, obj):
+        """Get PatientProfile ID if exists"""
+        return obj.patient_profile.id if hasattr(obj, 'patient_profile') and obj.patient_profile else None
+    
+    def get_blood_group(self, obj):
+        """Get blood group from profile if exists"""
+        return obj.patient_profile.blood_group if hasattr(obj, 'patient_profile') and obj.patient_profile else None
+    
+    def get_allergies(self, obj):
+        """Get allergies from profile if exists"""
+        return obj.patient_profile.allergies if hasattr(obj, 'patient_profile') and obj.patient_profile else ''
+    
+    def get_chronic_conditions(self, obj):
+        """Get chronic conditions from profile if exists"""
+        return obj.patient_profile.chronic_conditions if hasattr(obj, 'patient_profile') and obj.patient_profile else []
+    
+    def get_current_medications(self, obj):
+        """Get current medications from profile if exists"""
+        return obj.patient_profile.current_medications if hasattr(obj, 'patient_profile') and obj.patient_profile else []
+    
+    def get_preferred_language(self, obj):
+        """Get preferred language from profile if exists"""
+        return obj.patient_profile.preferred_language if hasattr(obj, 'patient_profile') and obj.patient_profile else 'english'
+    
+    def get_profile_is_active(self, obj):
+        """Get profile is_active status if exists"""
+        return obj.patient_profile.is_active if hasattr(obj, 'patient_profile') and obj.patient_profile else None
+    
+    def get_profile_created_at(self, obj):
+        """Get profile created_at if exists"""
+        return obj.patient_profile.created_at if hasattr(obj, 'patient_profile') and obj.patient_profile else None
+    
+    def get_profile_updated_at(self, obj):
+        """Get profile updated_at if exists"""
+        return obj.patient_profile.updated_at if hasattr(obj, 'patient_profile') and obj.patient_profile else None
     
     def get_total_consultations(self, obj):
         """Get total number of consultations"""
-        return obj.user.patient_consultations.count()
+        return obj.patient_consultations.count()
     
     def get_last_consultation_date(self, obj):
         """Get last consultation date"""
-        last_consultation = obj.user.patient_consultations.order_by('-created_at').first()
+        last_consultation = obj.patient_consultations.order_by('-created_at').first()
         if last_consultation:
             return last_consultation.created_at
         return None
+    
+    def get_clinics(self, obj):
+        """Get list of clinics this patient is registered to"""
+        from eclinic.models import ClinicPatient
+        clinic_patients = ClinicPatient.objects.filter(
+            patient=obj,
+            is_active=True
+        ).select_related('clinic')
+        
+        return [
+            {
+                'clinic_id': cp.clinic.id,
+                'clinic_name': cp.clinic.name,
+                'registered_at': cp.registered_at,
+                'registration_source': cp.registration_source
+            }
+            for cp in clinic_patients
+        ]
 
 
 class PatientSearchSerializer(serializers.Serializer):

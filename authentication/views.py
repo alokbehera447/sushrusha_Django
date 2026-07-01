@@ -542,6 +542,22 @@ class AdminUserManagementView(APIView):
                 }
                 
                 patient_profile = PatientProfile.objects.create(**patient_data)
+                
+                # Assign to clinic if created by admin (for deployed server compatibility)
+                try:
+                    if request.user.is_authenticated and request.user.role == 'admin':
+                        admin_clinic = getattr(request.user, 'administered_clinic', None)
+                        if admin_clinic:
+                            # Create ClinicPatient record
+                            from eclinic.models import ClinicPatient
+                            ClinicPatient.objects.create(
+                                patient=user,
+                                clinic=admin_clinic,
+                                registration_source='admin_created',
+                                is_active=True
+                            )
+                except Exception as e:
+                    print(f"Error creating ClinicPatient: {e}")
             
             return Response({
                 'success': True,

@@ -593,3 +593,81 @@ class ClinicDocument(models.Model):
         return f"{self.title} ({self.document_type}) for {self.clinic.name}"
 
 
+class ClinicPatient(models.Model):
+    """
+    Track patients registered/associated with a clinic.
+    A patient can belong to multiple clinics.
+    """
+    
+    REGISTRATION_SOURCE = [
+        ('admin_created', 'Created by Admin'),
+        ('consultation', 'Via Consultation'),
+        ('self_registered', 'Self Registered'),
+        ('migrated', 'Migrated from existing data'),
+    ]
+    
+    clinic = models.ForeignKey(
+        Clinic, 
+        on_delete=models.CASCADE, 
+        related_name='clinic_patients'
+    )
+    patient = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.CASCADE, 
+        related_name='patient_clinics',
+        limit_choices_to={'role': 'patient'}
+    )
+    
+    # Registration details
+    registration_source = models.CharField(
+        max_length=20, 
+        choices=REGISTRATION_SOURCE, 
+        default='admin_created'
+    )
+    registered_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name='registered_clinic_patients',
+        help_text="Admin who registered this patient"
+    )
+    
+    # Status
+    is_active = models.BooleanField(default=True)
+    
+    # Metadata
+    registered_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'clinic_patients'
+        verbose_name = 'Clinic Patient'
+        verbose_name_plural = 'Clinic Patients'
+        unique_together = ['clinic', 'patient']
+        ordering = ['-registered_at']
+        indexes = [
+            models.Index(fields=['clinic', 'is_active']),
+            models.Index(fields=['patient', 'is_active']),
+        ]
+    
+    def __str__(self):
+        return f"{self.patient.name} - {self.clinic.name}"
+    
+    @classmethod
+    def register_patient_to_clinic(cls, patient, clinic, registered_by=None, source='admin_created'):
+        """
+        Register a patient to a clinic. If already exists, return existing record.
+        """
+        clinic_patient, created = cls.objects.get_or_create(
+            clinic=clinic,
+            patient=patient,
+            defaults={
+                'registered_by': registered_by,
+                'registration_source': source,
+                'is_active': True
+            }
+        )
+        return clinic_patient, created
+
+
