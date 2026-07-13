@@ -17,42 +17,82 @@ def generate_otp(length=6):
     return ''.join(random.choices(string.digits, k=length))
 
 
-def send_otp_via_msg91(phone, otp, template_id, authkey, otp_length=5, extra_params=None):
-    """Send OTP via MSG91 API"""
-    url = 'https://control.msg91.com/api/v5/otp'
-    payload = {
-        'template_id': template_id,
-        'mobile': phone,
-        'authkey': authkey,
-        'otp': otp,
-        'otp_length': otp_length
+def send_otp_via_whatsapp_meta(phone, otp):
+    """Send OTP via Meta WhatsApp Cloud API"""
+    if getattr(settings, 'OTP_TEST_MODE', False):
+        return True
+    
+    token = getattr(settings, 'WHATSAPP_API_TOKEN', None)
+    phone_id = getattr(settings, 'WHATSAPP_PHONE_NUMBER_ID', None)
+    
+    if not token or not phone_id:
+        logger.error("WhatsApp credentials not set in settings")
+        return False
+        
+    # Format phone number for WhatsApp API (needs country code without +)
+    phone = ''.join(filter(str.isdigit, phone))
+    if not phone.startswith('91') and len(phone) == 10:
+        phone = '91' + phone
+    if phone.startswith('+'):
+        phone = phone[1:]
+        
+    url = f"https://graph.facebook.com/v20.0/{phone_id}/messages"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
     }
-    if extra_params:
-        payload.update(extra_params)
-    headers = {'Content-Type': 'application/JSON'}
+    
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": phone,
+        "type": "template",
+        "template": {
+            "name": "sushrusa_otp",
+            "language": {
+                "code": "en"
+            },
+            "components": [
+                {
+                    "type": "body",
+                    "parameters": [
+                        {
+                            "type": "text",
+                            "text": str(otp)
+                        }
+                    ]
+                },
+                {
+                    "type": "button",
+                    "sub_type": "url",
+                    "index": "0",
+                    "parameters": [
+                        {
+                            "type": "text",
+                            "text": str(otp)
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+    
     try:
-        response = requests.post(url, json=payload, headers=headers, timeout=10)
+        response = requests.post(url, headers=headers, json=payload, timeout=10)
         response.raise_for_status()
+        logger.info(f"WhatsApp Meta OTP sent successfully to {phone}")
         return True
     except Exception as e:
-        logger.error(f"MSG91 OTP send failed for {phone}: {str(e)}")
+        error_details = response.text if 'response' in locals() else 'No response object'
+        logger.error(f"WhatsApp Meta API failed for {phone}: {str(e)} - {error_details}")
         return False
 
 
 def send_otp_sms(phone, otp, purpose='login'):
-    """Send OTP via SMS using MSG91"""
+    """Send OTP via WhatsApp using Meta Cloud API"""
     try:
-        # Format message based on purpose (optional, MSG91 uses template)
-        # Get MSG91 config from settings
-        template_id = getattr(settings, 'MSG91_TEMPLATE_ID', None)
-        authkey = getattr(settings, 'MSG91_AUTHKEY', None)
-        otp_length = len(otp)
-        if not template_id or not authkey:
-            logger.error('MSG91 credentials not set in settings.')
-            return False
-        return send_otp_via_msg91(phone, otp, template_id, authkey, otp_length)
+        return send_otp_via_whatsapp_meta(phone, otp)
     except Exception as e:
-        logger.error(f"Failed to send OTP via MSG91 to {phone}: {str(e)}")
+        logger.error(f"Failed to send OTP via WhatsApp to {phone}: {str(e)}")
         return False
 
 

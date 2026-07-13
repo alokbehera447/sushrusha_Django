@@ -1575,3 +1575,53 @@ def account_type_lookup(request):
             'timestamp': timezone.now().isoformat()
         }, status=status.HTTP_404_NOT_FOUND)
 
+
+class WhatsAppWebhookView(APIView):
+    """
+    Webhook endpoint for Meta WhatsApp Business API.
+    Handles verification (GET) and incoming messages/events (POST).
+    """
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []  # No authentication needed for webhook
+
+    def get(self, request):
+        """Handle webhook verification from Meta"""
+        import os
+        from django.conf import settings
+        from django.http import HttpResponse
+        
+        # You can set this in your settings.py or environment variables
+        verify_token = getattr(settings, 'WHATSAPP_VERIFY_TOKEN', 'sushrusa_whatsapp_token')
+        
+        mode = request.GET.get('hub.mode')
+        token = request.GET.get('hub.verify_token')
+        challenge = request.GET.get('hub.challenge')
+
+        if mode and token:
+            if mode == 'subscribe' and token == verify_token:
+                print("WhatsApp webhook verified successfully")
+                return HttpResponse(challenge, status=200)
+            else:
+                print("WhatsApp webhook verification failed")
+                return HttpResponse('Forbidden', status=403)
+                
+        return HttpResponse('Bad Request', status=400)
+
+    def post(self, request):
+        """Handle incoming webhook events"""
+        from django.http import HttpResponse
+        try:
+            body = request.data
+            print(f"Received WhatsApp webhook event: {body}")
+            
+            # Check if this is a WhatsApp status update or message
+            if body.get('object') == 'whatsapp_business_account':
+                # Process messages/statuses here if needed in the future
+                
+                # Always return 200 OK to acknowledge receipt as required by Meta
+                return HttpResponse('EVENT_RECEIVED', status=200)
+                
+            return HttpResponse('Not Found', status=404)
+        except Exception as e:
+            print(f"Error processing WhatsApp webhook: {e}")
+            return HttpResponse('Internal Server Error', status=500)

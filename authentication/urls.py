@@ -13,6 +13,9 @@ urlpatterns = [
     path('refresh/', views.CustomTokenRefreshView.as_view(), name='token_refresh'),
     path('logout/', views.LogoutView.as_view(), name='logout'),
     
+    # WhatsApp Webhook
+    path('whatsapp/webhook/', views.WhatsAppWebhookView.as_view(), name='whatsapp_webhook'),
+    
     # Account type lookup
     path('account-type/', views.account_type_lookup, name='account_type_lookup'),
     
